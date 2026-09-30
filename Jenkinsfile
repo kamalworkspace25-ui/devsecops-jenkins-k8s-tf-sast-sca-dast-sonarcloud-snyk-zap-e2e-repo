@@ -51,7 +51,7 @@ pipeline {
 		}
 	      }
    	}
-	// 4 - OWASP ZAP Config //
+	// 4 - OWASP ZAP Config // PODS Up and Running Delay time setup
 	stage ('wait_for_testing'){
 	   steps {
 		   sh 'pwd; sleep 180; echo "Application Has been deployed on K8S"'
@@ -61,7 +61,7 @@ pipeline {
 	stage('RunDASTUsingZAP') {
           steps {
 		    withKubeConfig([credentialsId: 'kubelogin']) {
-				sh('zap.sh -cmd -quickurl http://$(kubectl get services/asgbuggy --namespace=devsecops -o json| jq -r ".status.loadBalancer.ingress[] | .hostname") -quickprogress -quickout ${WORKSPACE}/zap_report.html')
+				sh('zap.sh -cmd -quickurl http://$(kubectl get services/dsobuggy --namespace=devsecops -o json| jq -r ".status.loadBalancer.ingress[] | .hostname") -quickprogress -quickout ${WORKSPACE}/zap_report.html')
 				archiveArtifacts artifacts: 'zap_report.html'
 		    }
 	     }
