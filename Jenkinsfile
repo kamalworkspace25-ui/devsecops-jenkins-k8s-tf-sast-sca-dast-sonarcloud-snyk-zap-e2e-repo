@@ -4,25 +4,30 @@ pipeline {
         maven 'Maven_3_5_2'  
     }
    stages{
-    stage('CompileandRunSonarAnalysis') {
-            steps {	
-		sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=testoneado -Dsonar.organization=testoneado -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=0716ab3bd8d2d91a743a49cb07f61546fadbfcf3'
-			}
+   // 1 - Sonar SAST Scan //	   
+		stage('CompileandRunSonarAnalysis') {
+      steps {
+        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+          sh '''
+            mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=dsobuggyapp -Dsonar.projectKey=dsobuggyapp -Dsonar.token=$SONAR_TOKEN
+          '''
+        }
+      }
     }
-
-	stage('RunSCAAnalysisUsingSnyk') {
-            steps {		
-				withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-					sh 'mvn snyk:test -fn'
-				}
-			}
+		// 2 - Snyk SCA Scan //
+    stage('RunSCAAnalysisUsingSnyk') {
+      steps {
+        withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+          sh 'mvn snyk:test -fn'
+        }
+      }
     }
-
+	// 3 - Docker Image //
 	stage('Build') { 
             steps { 
                withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
                  script{
-                 app =  docker.build("asg")
+                 app =  docker.build("dsoecrrepo")
                  }
                }
             }
@@ -31,14 +36,14 @@ pipeline {
 	stage('Push') {
             steps {
                 script{
-                    docker.withRegistry('https://429128461530.dkr.ecr.us-east-1.amazonaws.com', 'ecr:us-east-1:aws-credentials') {
+                    docker.withRegistry('https://074832285117.dkr.ecr.us-west-2.amazonaws.com', 'ecr:us-west-2:aws-credentials') {
                     app.push("latest")
                     }
                 }
             }
     	}
-	   
-	stage('Kubernetes Deployment of ASG Bugg Web Application') {
+	// 3 - Kubernetes Config //
+	stage('Kubernetes Deployment of DSO Bugg Web Application') {
 	   steps {
 	      withKubeConfig([credentialsId: 'kubelogin']) {
 		  sh('kubectl delete all --all -n devsecops')
@@ -46,7 +51,7 @@ pipeline {
 		}
 	      }
    	}
-	   
+	// 4 - OWASP ZAP Config //
 	stage ('wait_for_testing'){
 	   steps {
 		   sh 'pwd; sleep 180; echo "Application Has been deployed on K8S"'
